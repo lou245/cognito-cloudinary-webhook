@@ -6,6 +6,7 @@ import requests
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
+from datetime import datetime
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +19,9 @@ cloudinary.config(
 )
 
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET")  # optional
+
+# In-memory storage for contestant metadata (replace with database in production)
+contestant_videos = {}
 
 def find_first_url(obj):
     if not obj: return None
@@ -43,6 +47,27 @@ def find_first_url(obj):
             if r: return r
     return None
 
+def extract_contestant_info(payload):
+    """Extract contestant name and video title from Cognito form data"""
+    contestant_name = "Unknown Contestant"
+    video_title = "Untitled Video"
+    
+    if payload and isinstance(payload, dict):
+        fields = payload.get("Fields", {})
+        if isinstance(fields, dict):
+            # Try multiple field name variations
+            contestant_name = (fields.get("ContestantName") or 
+                             fields.get("Contestant_Name") or 
+                             fields.get("Name") or 
+                             fields.get("Full Name") or 
+                             "Unknown Contestant")
+            video_title = (fields.get("VideoTitle") or 
+                          fields.get("Video_Title") or 
+                          fields.get("Title") or 
+                          "Untitled Video")
+    
+    return contestant_name, video_title
+
 @app.route("/cognito-webhook", methods=["POST"])
 def cognito_webhook():
     token = request.args.get("token")
@@ -66,6 +91,10 @@ def cognito_webhook():
             logging.debug(raw_text)
             return jsonify({"error": "no_file_url"}), 400
 
+        # Extract contestant info from payload
+        contestant_name, video_title = extract_contestant_info(payload)
+        logging.info("Contestant: %s, Video: %s", contestant_name, video_title)
+
         # Stream download from Cognito temp URL
         logging.info("Starting download from Cognito temp URL")
         r = requests.get(temp_url, stream=True, timeout=60)
@@ -78,13 +107,29 @@ def cognito_webhook():
             r.raw,
             resource_type="video",
             filename=filename,
-            # optional: set a public_id or folder if you want a predictable URL
-            # public_id="videos/" + filename.split(".")[0]
+            tags=[contestant_name.lower().replace(" ", "_")],
+            context={"contestant": contestant_name, "title": video_title}
         )
-        logging.info("Cloudinary upload successful: %s", upload_result.get("public_id"))
+        
+        public_id = upload_result.get("public_id")
+        logging.info("Cloudinary upload successful: %s", public_id)
+        
+        # Store video metadata
+        contestant_videos[public_id] = {
+            "contestantName": contestant_name,
+            "videoTitle": video_title,
+            "publicId": public_id,
+            "uploadedAt": datetime.utcnow().isoformat(),
+            "cloudinaryData": upload_result
+        }
 
-        # Return success
-        return jsonify({"status": "ok", "cloudinary": upload_result}), 200
+        return jsonify({
+            "status": "ok",
+            "public_id": public_id,
+            "contestant": contestant_name,
+            "title": video_title,
+            "cloudinary": upload_result
+        }), 200
 
     except requests.exceptions.RequestException as e:
         logging.exception("Network error during download/upload")
@@ -93,13 +138,39 @@ def cognito_webhook():
         logging.exception("Unexpected error")
         return jsonify({"error": "unexpected", "message": str(e)}), 500
 
+@app.route("/api/videos", methods=["GET"])
+def get_videos():
+    """Get all uploaded videos with contestant metadata"""
+    try:
+        videos = list(contestant_videos.values())
+        return jsonify({
+            "videos": videos,
+            "count": len(videos)
+        }), 200
+    except Exception as e:
+        logging.exception("Error fetching videos")
+        return jsonify({"error": "failed_to_fetch", "message": str(e)}), 500
+
+@app.route("/api/videos/<public_id>", methods=["GET"])
+def get_video(public_id):
+    """Get a specific video by public_id"""
+    try:
+        if public_id not in contestant_videos:
+            return jsonify({"error": "not_found"}), 404
+        
+        return jsonify(contestant_videos[public_id]), 200
+    except Exception as e:
+        logging.exception("Error fetching video")
+        return jsonify({"error": "failed_to_fetch", "message": str(e)}), 500
+
+@app.route("/api/health", methods=["GET"])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        "status": "healthy",
+        "cloudinary_configured": bool(os.environ.get("CLOUDINARY_CLOUD_NAME")),
+        "total_videos": len(contestant_videos)
+    }), 200
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
-
-On your webpage, embed the player like this (replace [CLOUD_NAME] and [PUBLIC_ID]):
-<iframe
-  src="https://player.cloudinary.com/embed/?cloud_name=[CLOUD_NAME]&public_id=[PUBLIC_ID]"
-  width="640" height="360" frameborder="0" allowfullscreen></iframe>
-
-  
-   
