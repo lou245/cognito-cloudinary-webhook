@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Gallery</title>
+    <link rel="stylesheet" href="https://unpkg.com/@cloudinary/css@latest/cloudinary-video-gallery.css">
+    <script src="https://unpkg.com/@cloudinary/js@latest/cloudinary-video-gallery.min.js"></script>
+</head>
+<body>
+    <h1>Cloudinary Video Gallery</h1>
+    <div class="cloudinary-video-gallery" data-public-id="your-public-id" data-include-thumbnail="true" data-show-metadata="true"></div>
+    <script>
+        const gallery = new cloudinary.VideoGallery({
+            container: '.cloudinary-video-gallery',
+            cloudName: 'your-cloud-name',
+            sources: ['your-video-source'],
+        });
+        gallery.render();
+    </script>
+</body>
+</html>
