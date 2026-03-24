@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wix Gallery</title>
+</head>
+<body>
+    <h1>Wix Gallery Integration</h1>
+    <div id="gallery"></div>
+    <script>
+        // Replace with your Render API endpoint
+        const apiEndpoint = 'https://your-render-api-endpoint.com/gallery';
+
+        async function fetchGallery() {
+            try {
+                const response = await fetch(apiEndpoint);
+                const data = await response.json();
+                displayGallery(data);
+            } catch (error) {
+                console.error('Error fetching data:', error);
+            }
+        }
+
+        function displayGallery(items) {
+            const galleryDiv = document.getElementById('gallery');
+            items.forEach(item => {
+                const img = document.createElement('img');
+                img.src = item.imageUrl;
+                img.alt = item.description;
+                galleryDiv.appendChild(img);
+            });
+        }
+
+        // Fetch and display the gallery when the page loads
+        fetchGallery();
+    </script>
+</body>
+</html>
