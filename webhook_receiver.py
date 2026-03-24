@@ -2,6 +2,7 @@ import os
 import logging
 import urllib.parse
 from flask import Flask, request, jsonify, abort
+from flask_cors import CORS
 import requests
 import cloudinary
 import cloudinary.uploader
@@ -9,6 +10,7 @@ import cloudinary.api
 from datetime import datetime
 
 app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": ["https://www.itsalittlesketchy.com", "https://itsalittlesketchy.com"]}})
 logging.basicConfig(level=logging.INFO)
 
 # Cloudinary config (set these in Render env vars)

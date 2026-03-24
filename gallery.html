@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Contestant Video Gallery</title>
+    <link href="https://unpkg.com/cloudinary-video-player/dist/cld-video-player.min.css" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -270,8 +271,11 @@
         </div>
     </div>
 
+    <script src="https://unpkg.com/cloudinary-core/cloudinary-core-shrinkwrap.min.js"></script>
+    <script src="https://unpkg.com/cloudinary-video-player/dist/cld-video-player.min.js"></script>
     <script>
-        let cloudName = 'YOUR_CLOUD_NAME';
+        const cloudName = 'dl1camsl1';
+        const API_URL = 'https://cognito-cloudinary-webhook-1.onrender.com/api/videos';
 
         function formatTime(dateString) {
             const date = new Date(dateString);
@@ -287,12 +291,12 @@
         }
 
         function getThumbnailUrl(publicId) {
-            return `https://res.cloudinary.com/${cloudName}/video/fetch/w_300,h_170,c_fill,q_auto/${publicId}.jpg`;
+            return `https://res.cloudinary.com/${cloudName}/video/upload/w_300,h_170,c_fill,q_auto/${publicId}.jpg`;
         }
 
         async function loadVideos() {
             try {
-                const response = await fetch('/api/videos');
+                const response = await fetch(API_URL);
                 const data = await response.json();
                 
                 const gallery = document.getElementById('gallery');
@@ -320,7 +324,7 @@
                 loading.style.display = 'none';
             } catch (err) {
                 console.error('Error loading videos:', err);
-                document.getElementById('error').textContent = 'Failed to load videos. Make sure the Flask server is running.';
+                document.getElementById('error').textContent = 'Failed to load videos. Please try again later or check that the server is running.';
                 document.getElementById('error').style.display = 'block';
                 document.getElementById('loading').style.display = 'none';
             }
@@ -335,17 +339,15 @@
             document.getElementById('detailPublicId').textContent = video.publicId;
 
             const playerContainer = document.getElementById('playerContainer');
-            playerContainer.innerHTML = `
-                <iframe
-                    src="https://player.cloudinary.com/embed/?cloud_name=${cloudName}&public_id=${video.publicId}"
-                    width="100%"
-                    height="400"
-                    frameborder="0"
-                    allowfullscreen
-                    class="video-player"
-                    allow="autoplay; fullscreen">
-                </iframe>
-            `;
+            playerContainer.innerHTML = `<video id="cld-video-player" controls class="video-player"></video>`;
+
+            const cld = cloudinary.Cloudinary.new({ cloud_name: cloudName });
+            const player = cld.videoPlayer('cld-video-player', {
+                fluid: true,
+                controls: true,
+                preload: 'auto'
+            });
+            player.source(video.publicId);
 
             modal.classList.add('active');
             document.body.style.overflow = 'hidden';
@@ -355,6 +357,8 @@
             const modal = document.getElementById('videoModal');
             modal.classList.remove('active');
             document.body.style.overflow = 'auto';
+            // Clear the player container to stop video playback
+            document.getElementById('playerContainer').innerHTML = '';
         }
 
         window.onclick = function(event) {
