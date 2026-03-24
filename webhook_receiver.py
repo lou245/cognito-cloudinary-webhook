@@ -107,6 +107,7 @@ def cognito_webhook():
             r.raw,
             resource_type="video",
             filename=filename,
+            folder="contestant_video_gallery",
             tags=[contestant_name.lower().replace(" ", "_")],
             context={"contestant": contestant_name, "title": video_title}
         )
